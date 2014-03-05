@@ -39,7 +39,7 @@ parser.add_argument('-x', '--dist', dest='distance_cutoff', default=0.32, type=f
 parser.add_argument('-z', '--no_split', dest='no_split', action='store_true', default=False, help="Use to process all sequences using a single thread. Can reduce errors with very small sequence sets.")
 parser.add_argument('-n', '--nt', dest='is_aa', action='store_false', default=True, help="Uses nucleotide CDR3 sequences instead of amino acid sequences (default).")
 parser.add_argument('-u', '--no_update', dest='update', action='store_false', default=True, help="Use to skip updating the MongoDB database with clonality info.")
-parser.add_argument('-k', '--chunksize', dest='chunksize', type=int, default=10, help="Splits the input_seqs into roughly <chunksize>-sized pieces and builds distance submatrices for each pair of chunks separately. Typically, this shouldn't be changed.")
+parser.add_argument('-k', '--chunksize', dest='chunksize', type=int, default=500, help="Splits the input_seqs into roughly <chunksize>-sized pieces and builds distance submatrices for each pair of chunks separately. Typically, this shouldn't be changed.")
 args = parser.parse_args()
 
 

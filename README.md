@@ -10,6 +10,7 @@ requirements
 ------------
 numpy  
 scipy  
+biopython  
 pymongo  
 python-levenshtein  
 fastcluster    

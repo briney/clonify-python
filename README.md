@@ -8,6 +8,7 @@ usage
   
 requirements
 ------------
+python >=2.7
 numpy  
 scipy  
 biopython  
@@ -15,7 +16,7 @@ pymongo
 python-levenshtein  
 fastcluster    
   
-all requirements can be installed with pip:  
+all package requirements can be installed with pip:  
 `sudo pip install <package>`
 
 

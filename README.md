@@ -10,7 +10,7 @@ will work and will iteratively run Clonify on all collections in the specified d
 For remote databases, and to specify a single collection:  
 `python clonify.py -i <MongoDB IP> -p <MongoDB port> -d <database> -c <collection>`  
   
-Finally, to run Clonify without updating the atarget MongoDB with clone information and instead writing basic lineage information to an output file:  
+Finally, to run Clonify without updating the target MongoDB with clone information and instead writing basic lineage information to an output file:  
 `python clonify.py -i <MongoDB IP> -p <MongoDB port> -d <database> -c <collection> -o <output_file> -n`  
 
   

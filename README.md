@@ -17,6 +17,6 @@ python-levenshtein
 fastcluster    
   
 all package requirements can be installed with pip:  
-`sudo pip install <package>`
+`pip install <package>`
 
 

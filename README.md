@@ -3,7 +3,7 @@ clonify
   
 usage
 -----
-If MongoDB is local, `python clonify.py -d <database>` will work and will iteratively run Clonify on all collections in the specified database.  
+If MongoDB is local, `python clonify.py -d <database>` will iteratively run Clonify on all collections in the specified database.  
   
 For remote databases, and to specify a single collection:  
 `python clonify.py -i <MongoDB IP> -p <MongoDB port> -d <database> -c <collection>`  

@@ -110,14 +110,12 @@ def get_LD(i, j):
 
 def vCompare(i, j):
 	'Calculate penalty for mismatches in Variable segment.'
-	if i.v_gene != j.v_gene: return 8
-	if i.v_all != j.v_all: return 1
+	if i.v_gene != j.v_gene: return 10
 	return 0
 
 def jCompare(i, j):
 	'Calculate penalty for mismatches in Joining segment.'
 	if i.j_gene != j.j_gene: return 8
-	if i.j_all != j.j_all: return 1
 	return 0
 
 def sharedMuts(i, j):

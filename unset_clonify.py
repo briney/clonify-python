@@ -1,10 +1,10 @@
 #!/usr/bin/python
-# filename: restore_clonify.py
+# filename: unset_clonify.py
 
 
 ###########################################################################
 #
-# Copyright (c) 2013 Bryan Briney.  All rights reserved.
+# Copyright (c) 2014 Bryan Briney.  All rights reserved.
 #
 # @version: 1.0.0
 # @author: Bryan Briney
@@ -14,25 +14,31 @@
 
 
 import argparse
+
 from pymongo import MongoClient
 
+
 parser = argparse.ArgumentParser("Restores the MongoDB to the pre-make_nr state.")
-parser.add_argument('-i', '-ip', dest='mongo_ip', default='localhost', help="The IP address of the MongoDB server. Default is 'localhost'.")
-parser.add_argument('-p', '-port', dest='mongo_port', default=27017, type=int, help="The MongoDB port. Default is 27017.")
-parser.add_argument('-d' '-database', dest='database', required=True, help="The database to query. Required.")
-parser.add_argument('-c' '-collection', dest='collection', default='', help="The collection to query. If not provided, all collections in the database will be processed iteratively.")
+parser.add_argument('-i', '-ip', dest='mongo_ip', default='localhost', 
+					help="The IP address of the MongoDB server. Default is 'localhost'.")
+parser.add_argument('-p', '-port', dest='mongo_port', default=27017, type=int, 
+					help="The MongoDB port. Default is 27017.")
+parser.add_argument('-d' '-database', dest='database', required=True, 
+					help="The database to query. Required.")
+parser.add_argument('-c' '-collection', dest='collection', default=None, 
+					help="The collection to query. If not provided, \
+					all collections in the database will be processed iteratively.")
 args = parser.parse_args()
 
-def get_collections():
 
-	if args.collection == '':
-		conn = MongoClient(args.mongo_ip, args.mongo_port)
-		db = conn[args.database]
-		collections = db.collection_names()
-		collections.remove('system.indexes')
-		return sorted(collections)
-	else:
+def get_collections():
+	if args.collection:
 		return [args.collection,]
+	conn = MongoClient(args.mongo_ip, args.mongo_port)
+	db = conn[args.database]
+	collections = db.collection_names(include_system_collections=False)
+	return sorted(collections)
+		
 
 def update_db(collection):
 	conn = MongoClient(args.mongo_ip, args.mongo_port)

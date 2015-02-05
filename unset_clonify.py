@@ -18,7 +18,7 @@ import argparse
 from pymongo import MongoClient
 
 
-parser = argparse.ArgumentParser("Restores the MongoDB to the pre-make_nr state.")
+parser = argparse.ArgumentParser("Removes Clonify lineage assignments from a MongoDB database.")
 parser.add_argument('-i', '-ip', dest='mongo_ip', default='localhost', 
 					help="The IP address of the MongoDB server. Default is 'localhost'.")
 parser.add_argument('-p', '-port', dest='mongo_port', default=27017, type=int, 

@@ -4,7 +4,7 @@
 
 ###########################################################################
 #
-# Copyright (c) 2013 Bryan Briney.  All rights reserved.
+# Copyright (c) 2014 Bryan Briney.  All rights reserved.
 #
 # @version: 1.0.0
 # @author: Bryan Briney
@@ -18,39 +18,62 @@ import time
 import math
 import argparse
 import itertools
-import numpy as np
-import fastcluster as fc
-from Bio import pairwise2
-from pymongo import MongoClient
-from Levenshtein import distance
 from multiprocessing import Pool, cpu_count
+
+from pymongo import MongoClient
+
+import numpy as np
+
+import fastcluster as fc
 from scipy.cluster.hierarchy import fcluster
+
+from Bio import pairwise2
+from Levenshtein import distance
+
 
 
 parser = argparse.ArgumentParser("")
-parser.add_argument('-d', '--db', dest='db',required=True, help="The MongoDB database to be queried. Required.")
-parser.add_argument('-c', '--coll', dest='coll',default='', help="The MongoDB collection to be queried. If ommitted, all collections in the database will be processed.")
-parser.add_argument('-i', '--ip', dest='ip', default='localhost', help="The IP address of the MongoDB server. Defaults to 'localhost'.")
-parser.add_argument('-p', '--port', dest='port', default=27017, type=int, help="The port used to connect to the MongoDB server. Defaults to '27017'.")
-parser.add_argument('-o', '--out', dest='output', default='', help="Directory for the output files. Files will be named '<collection>_clones.txt'. Failing to provide an output directory will result in no output files being written.")
-parser.add_argument('-s', '--split_by', dest='split_by', default='none', choices=['none', 'fam', 'gene'], help="Define how to split the input sequence pool. Choices are 'fam' and 'gene'. Splitting by 'gene' may cause a small number of false negatives due to IgBLAST germline misassignment, but can provide large reductions in processing time and memory use. Default is 'fam'.")
-parser.add_argument('-t', '--threads', dest='threads', type=int, default=None, help="Number of threads to use. Default is max available.")
-parser.add_argument('-x', '--dist', dest='distance_cutoff', default=0.32, type=float, help="The cutoff adjusted edit distance (aED) for segregating sequences into clonal families. Defaults to 0.32.")
-parser.add_argument('-z', '--no_split', dest='no_split', action='store_true', default=False, help="Use to process all sequences using a single thread. Can reduce errors with very small sequence sets.")
-parser.add_argument('-n', '--nt', dest='is_aa', action='store_false', default=True, help="Uses nucleotide CDR3 sequences instead of amino acid sequences (default).")
-parser.add_argument('-u', '--no_update', dest='update', action='store_false', default=True, help="Use to skip updating the MongoDB database with clonality info.")
-parser.add_argument('-k', '--chunksize', dest='chunksize', type=int, default=500, help="Splits the input_seqs into roughly <chunksize>-sized pieces and builds distance submatrices for each pair of chunks separately. Typically, this shouldn't be changed.")
+parser.add_argument('-d', '--db', dest='db', required=True, 
+					help="The MongoDB database to be queried. Required.")
+parser.add_argument('-c', '--coll', dest='coll', default=None, 
+					help="The MongoDB collection to be queried. If ommitted, all collections in the database will be processed.")
+parser.add_argument('-i', '--ip', dest='ip', default='localhost', 
+					help="The IP address of the MongoDB server. Defaults to 'localhost'.")
+parser.add_argument('-p', '--port', dest='port', default=27017, type=int, 
+					help="The port used to connect to the MongoDB server. Defaults to '27017'.")
+parser.add_argument('-o', '--out', dest='output', default='', 
+					help="Directory for the output files. Files will be named '<collection>_clones.txt'. \
+					Failing to provide an output directory will result in no output files being written.")
+parser.add_argument('-s', '--split_by', dest='split_by', default='none', choices=['none', 'fam', 'gene'], 
+					help="Define how to split the input sequence pool. Choices are 'fam' and 'gene'. \
+					Splitting by 'gene' may cause a small number of false negatives due to IgBLAST germline misassignment, \
+					but can provide large reductions in processing time and memory use. Default is 'fam'.")
+parser.add_argument('-t', '--threads', dest='threads', type=int, default=None, 
+					help="Number of threads to use. Default is max available.")
+parser.add_argument('-x', '--dist', dest='distance_cutoff', default=0.26, type=float, 
+					help="The cutoff adjusted edit distance (aED) for segregating sequences into clonal families. \
+					Defaults to 0.26.")
+parser.add_argument('-z', '--no_split', dest='no_split', action='store_true', default=False, 
+					help="Use to process all sequences using a single thread. Can reduce errors with very small sequence sets.")
+parser.add_argument('-n', '--nt', dest='is_aa', action='store_false', default=True, 
+					help="Uses nucleotide CDR3 sequences instead of amino acid sequences (default).")
+parser.add_argument('-u', '--no_update', dest='update', action='store_false', default=True, 
+					help="Use to skip updating the MongoDB database with clonality info.")
+parser.add_argument('-k', '--chunksize', dest='chunksize', type=int, default=500, 
+					help="Splits the input_seqs into roughly <chunksize>-sized pieces and builds distance submatrices \
+					for each pair of chunks separately. Typically, this shouldn't be changed.")
 args = parser.parse_args()
 
 
 class Seq(object):
-	"""Contains genetic characteristics for a single sequence.
-	   Input:
-	   data = a MongoDB result (dict-like) containing the following fields:
-	   			[seq_id, v_gene, j_gene, <junc_query>, var_muts_nt]
-	   			where <junc_query> is the sequence of the nucleotide or AA junction.
-	   junc_query = either 'junc_aa' or 'junc_nt' for nucleotide or AA junctions, respectively.
-	"""
+	'''
+	Contains genetic characteristics for a single sequence.
+	Input:
+	data = a MongoDB result (dict-like) containing the following fields:
+				[seq_id, v_gene, j_gene, <junc_query>, var_muts_nt]
+	   	   where <junc_query> is the sequence of the nucleotide or AA junction.
+	junc_query = either 'junc_aa' or 'junc_nt' for nucleotide or AA junctions, respectively.
+	'''
 	def __init__(self, data, junc_query):
 		self.id       = data['seq_id']
 		self.v_fam    = data['v_gene']['fam']
@@ -99,10 +122,14 @@ def get_scores(i, jchunk):
 	return results
 
 def get_LD(i, j):
-	'Calculate sequence distance between a pair of Seq objects'
+	'''
+	Calculate sequence distance between a pair of Seq objects
+	'''
 	# pairwise2 is used to force 'gapless' distance when sequence pair is of the same length
 	if i.junc_len == j.junc_len:
-		identity = pairwise2.align.globalms(i.junc, j.junc, 1, 0, -50, -50, score_only=True, one_alignment_only=True)
+		identity = pairwise2.align.globalms(i.junc, j.junc, 1, 0, -50, -50, 
+											score_only=True, 
+											one_alignment_only=True)
 		return i.junc_len - identity
 	# Levenshtein distance is used for sequence pairs of different lengths
 	else:
@@ -140,7 +167,8 @@ def get_seqs(database, collection):
 		junc_query = 'junc_aa'
 	else: 
 		junc_query = 'junc_nt'
-	results = c.find({'chain': 'heavy'}, {'_id': 0, 'seq_id': 1, 'v_gene': 1, 'j_gene': 1, junc_query: 1, 'var_muts_nt': 1})
+	results = c.find({'chain': 'heavy'}, 
+					 {'_id': 0, 'seq_id': 1, 'v_gene': 1, 'j_gene': 1, junc_query: 1, 'var_muts_nt': 1})
 	output = []
 	for r in results:
 		if r is not None:
@@ -150,12 +178,11 @@ def get_seqs(database, collection):
 	return output
 
 def get_collections():
-	if args.coll != '': 
+	if args.coll: 
 		return [args.coll,]
 	conn = MongoClient(args.ip, args.port)
 	db   = conn[args.db]
-	subjects = db.collection_names()
-	subjects.remove('system.indexes')
+	subjects = db.collection_names(include_system_collections=False)
 	return sorted(subjects)
 
 def update_db(database, collection, clusters):
@@ -169,7 +196,9 @@ def update_db(database, collection, clusters):
 		seq_ids = [s.id for s in clusters[clust_id]]
 		if clust_size > 1:
 			if args.update:
-				c.update({'seq_id': {'$in': seq_ids}}, {'$set': {'clonify': {'id': clust_id, 'size': clust_size}}}, multi=True)
+				c.update({'seq_id': {'$in': seq_ids}}, 
+						 {'$set': {'clonify': {'id': clust_id, 'size': clust_size}}}, 
+						 multi=True)
 			clust_count += 1
 			clust_sizes.append(clust_size)
 	clustered_seqs = sum(clust_sizes)
@@ -188,8 +217,9 @@ def count_cpus():
 	return cpu_count()
 
 def split_by_gene(seqs):
-	'''Splits sequences by variable gene.
-	   Returns a dict with var genes as keys, seqs as values.
+	'''
+	Splits sequences by variable gene.
+	Returns a dict with var genes as keys, seqs as values.
 	'''
 	split = {}
 	for seq in seqs:
@@ -200,8 +230,9 @@ def split_by_gene(seqs):
 	return split
 
 def split_by_fam(seqs):
-	'''Splits sequences by variable family.
-	   Returns a dict with var fams as keys, seqs as values.
+	'''
+	Splits sequences by variable family.
+	Returns a dict with var fams as keys, seqs as values.
 	'''
 	split = {}
 	for seq in seqs:
@@ -212,8 +243,9 @@ def split_by_fam(seqs):
 	return split
 
 def get_chunksize(input):
-	'''Calculates an appropriate sequence 'chunk' size, based on the number of 
-	   input sequences and the number of available processors. 
+	'''
+	Calculates an appropriate sequence 'chunk' size, based on the number of 
+	input sequences and the number of available processors. 
 	'''
 	if args.no_split:
 		return len(input)
@@ -228,12 +260,17 @@ def get_chunksize(input):
 	return int(math.ceil(s))
 
 def chunk_maker(n, iterable, fillvalue=None):
-	"chunk_maker(3, 'ABCDEFG', 'x') --> ['ABC', 'DEF', 'Gxx']"
+	'''
+	chunk_maker(3, 'ABCDEFG', 'x') --> ['ABC', 'DEF', 'Gxx']
+	where x = fillvalue
+	'''
 	args = [iter(iterable)] * n
 	return [[e for e in t if e != None] for t in itertools.izip_longest(*args)]
 
 def grouper_nofill(n, iterable):
- 	"list(grouper_nofill(3, 'ABCDEFG')) --> [['A', 'B', 'C'], ['D', 'E', 'F'], ['G']]"
+ 	'''
+ 	list(grouper_nofill(3, 'ABCDEFG')) --> [['A', 'B', 'C'], ['D', 'E', 'F'], ['G']]
+ 	'''
  	it=iter(iterable)
  	def take():
 		while 1: yield list(itertools.islice(it,n))
@@ -260,8 +297,9 @@ def build_matrix(ichunks, chunksize, size, chunk_count):
 	return matrix
 
 def squareform(matrix):
-	'''Transform a squareform distance matrix into a condensed matrix. Input is an array of size N**2 
-	   (N = number of sequences). Output is an array of size (N * (N-1)) / 2.
+	'''
+	Transform a squareform distance matrix into a condensed matrix. Input is an array of size N**2 
+	(N = number of sequences). Output is an array of size (N * (N-1)) / 2.
 	'''
 	cm = []
 	for i, row in enumerate(matrix[:-1]):
@@ -286,13 +324,17 @@ def make_clusters(input_seqs, vh):
 	return clusters
 
 def assign_seqs(flatCluster, clusters, input_seqs, vh):
+	'''
+	Partition sequences into lineage clusters
+	'''
 	for s in xrange(len(flatCluster)):
 		s_id = 'lineage_{0}_{1}'.format(vh, str(flatCluster[s]))
 		clusters[s_id].append(input_seqs[s])
 	return clusters
 
 def analyze_collection(coll):
-	'''Control function for complete processing of a single MongoDB collection.
+	'''
+	Control function for complete processing of a single MongoDB collection.
 	'''
 	# query
 	startTime = time.time()
@@ -300,6 +342,7 @@ def analyze_collection(coll):
 	seqs = get_seqs(args.db, coll)
 	print_query_end(len(seqs))
 	queryEnd = time.time()
+
 	# seq splitting
 	if len(seqs) < 2:
 		return False
@@ -309,6 +352,7 @@ def analyze_collection(coll):
 		split_seqs = split_by_fam(seqs)
 	else:
 		split_seqs = {'v0': seqs}
+
 	# clonify
 	print_clonify_start()
 	clusters = {}
@@ -318,6 +362,7 @@ def analyze_collection(coll):
 		clusters.update(make_clusters(split_seqs[vh], vh))
 	print_clonify_end()
 	clonifyEnd = time.time()
+	
 	# update MongoDB
 	if args.update: 
 		print_update_start()
@@ -326,13 +371,13 @@ def analyze_collection(coll):
 	cluster_stats = update_db(args.db, coll, clusters)
 	print_update_end()
 	updateEnd = time.time()
+	
 	# write output
 	if args.output != '':
 		print_write_start()
 		write_output(args.output, coll, clusters)
 		print_write_end()
 	else: print_write_null()
-	# print summary
 	print_run_summary(cluster_stats, startTime, queryEnd, clonifyEnd, updateEnd, len(seqs))
 
 

@@ -85,7 +85,7 @@ class Seq(object):
 		self.junc_len = len(self.junc)
 		self.muts     = []
 		if 'var_muts_nt' in data.keys(): 
-			self.muts = data['var_muts_nt']
+			self.muts = ['{}{}'.format(d['loc'], d['mut']) for d in data['var_muts_nt']]
 
 	def v_gene_string(self):
 		return 'v{0}-{1}'.format(self.v_fam, self.v_gene)

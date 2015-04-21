@@ -8,7 +8,7 @@
 #
 # @version: 1.0.0
 # @author: Bryan Briney
-# @license: MIT (http://opensource.org/licenses/MIT) 
+# @license: MIT (http://opensource.org/licenses/MIT)
 #
 ###########################################################################
 
@@ -33,33 +33,33 @@ from Levenshtein import distance
 
 
 parser = argparse.ArgumentParser("")
-parser.add_argument('-d', '--db', dest='db', required=True, 
+parser.add_argument('-d', '--db', dest='db', required=True,
 					help="The MongoDB database to be queried. Required.")
-parser.add_argument('-c', '--coll', dest='coll', default=None, 
+parser.add_argument('-c', '--coll', dest='coll', default=None,
 					help="The MongoDB collection to be queried. If ommitted, all collections in the database will be processed.")
-parser.add_argument('-i', '--ip', dest='ip', default='localhost', 
+parser.add_argument('-i', '--ip', dest='ip', default='localhost',
 					help="The IP address of the MongoDB server. Defaults to 'localhost'.")
-parser.add_argument('-p', '--port', dest='port', default=27017, type=int, 
+parser.add_argument('-p', '--port', dest='port', default=27017, type=int,
 					help="The port used to connect to the MongoDB server. Defaults to '27017'.")
-parser.add_argument('-o', '--out', dest='output', default='', 
+parser.add_argument('-o', '--out', dest='output', default='',
 					help="Directory for the output files. Files will be named '<collection>_clones.txt'. \
 					Failing to provide an output directory will result in no output files being written.")
-parser.add_argument('-s', '--split_by', dest='split_by', default='none', choices=['none', 'fam', 'gene'], 
+parser.add_argument('-s', '--split_by', dest='split_by', default='none', choices=['none', 'fam', 'gene'],
 					help="Define how to split the input sequence pool. Choices are 'fam' and 'gene'. \
 					Splitting by 'gene' may cause a small number of false negatives due to IgBLAST germline misassignment, \
 					but can provide large reductions in processing time and memory use. Default is 'fam'.")
-parser.add_argument('-t', '--threads', dest='threads', type=int, default=None, 
+parser.add_argument('-t', '--threads', dest='threads', type=int, default=None,
 					help="Number of threads to use. Default is max available.")
-parser.add_argument('-x', '--dist', dest='distance_cutoff', default=0.26, type=float, 
+parser.add_argument('-x', '--dist', dest='distance_cutoff', default=0.26, type=float,
 					help="The cutoff adjusted edit distance (aED) for segregating sequences into clonal families. \
 					Defaults to 0.26.")
-parser.add_argument('-z', '--no_split', dest='no_split', action='store_true', default=False, 
+parser.add_argument('-z', '--no_split', dest='no_split', action='store_true', default=False,
 					help="Use to process all sequences using a single thread. Can reduce errors with very small sequence sets.")
-parser.add_argument('-n', '--nt', dest='is_aa', action='store_false', default=True, 
+parser.add_argument('-n', '--nt', dest='is_aa', action='store_false', default=True,
 					help="Uses nucleotide CDR3 sequences instead of amino acid sequences (default).")
-parser.add_argument('-u', '--no_update', dest='update', action='store_false', default=True, 
+parser.add_argument('-u', '--no_update', dest='update', action='store_false', default=True,
 					help="Use to skip updating the MongoDB database with clonality info.")
-parser.add_argument('-k', '--chunksize', dest='chunksize', type=int, default=500, 
+parser.add_argument('-k', '--chunksize', dest='chunksize', type=int, default=500,
 					help="Splits the input_seqs into roughly <chunksize>-sized pieces and builds distance submatrices \
 					for each pair of chunks separately. Typically, this shouldn't be changed.")
 args = parser.parse_args()
@@ -75,16 +75,16 @@ class Seq(object):
 	junc_query = either 'junc_aa' or 'junc_nt' for nucleotide or AA junctions, respectively.
 	'''
 	def __init__(self, data, junc_query):
-		self.id       = data['seq_id']
-		self.v_fam    = data['v_gene']['fam']
-		self.v_gene   = data['v_gene']['gene']
-		self.v_all    = data['v_gene']['all']
-		self.j_gene   = data['j_gene']['gene']
-		self.j_all    = data['j_gene']['all']
-		self.junc     = data[junc_query]
+		self.id = data['seq_id']
+		self.v_fam = data['v_gene']['fam']
+		self.v_gene = data['v_gene']['gene']
+		self.v_all = data['v_gene']['all']
+		self.j_gene = data['j_gene']['gene']
+		self.j_all = data['j_gene']['all']
+		self.junc = data[junc_query]
 		self.junc_len = len(self.junc)
-		self.muts     = []
-		if 'var_muts_nt' in data.keys(): 
+		self.muts = []
+		if 'var_muts_nt' in data.keys():
 			self.muts = ['{}{}'.format(d['loc'], d['mut']) for d in data['var_muts_nt']]
 
 	def v_gene_string(self):
@@ -92,18 +92,22 @@ class Seq(object):
 
 	def v_fam_string(self):
 		return 'v{0}'.format(self.v_fam)
-		
 
 
-#-----------------------------
-#          CLONIFY
-#-----------------------------
+
+
+# -----------------------------
+#           CLONIFY
+# -----------------------------
+
+
 
 def clonify((ichunk, jchunk)):
 	results = []
 	for i in ichunk:
-		results.append(get_scores(i,jchunk))
+		results.append(get_scores(i, jchunk))
 	return results
+
 
 def get_scores(i, jchunk):
 	results = []
@@ -111,15 +115,17 @@ def get_scores(i, jchunk):
 		if i.id == j.id:
 			results.append(0.0)
 			continue
-		LD 		   = get_LD(i,j)
-		vPenalty   = vCompare(i,j)
-		jPenalty   = jCompare(i,j)
+		LD = get_LD(i, j)
+		vPenalty = vCompare(i, j)
+		jPenalty = jCompare(i, j)
 		lenPenalty = math.fabs(i.junc_len - j.junc_len) * 2
 		editLength = min(i.junc_len, j.junc_len)
-		mutBonus   = sharedMuts(i,j)
-		if mutBonus > (LD + vPenalty + jPenalty): mutBonus = (LD + vPenalty + jPenalty - 0.001)  # distance values can't be negative
+		mutBonus = sharedMuts(i, j)
+		if mutBonus > (LD + vPenalty + jPenalty):
+			mutBonus = (LD + vPenalty + jPenalty - 0.001)  # distance values can't be negative
 		results.append((LD + vPenalty + jPenalty + lenPenalty - mutBonus) / editLength)
 	return results
+
 
 def get_LD(i, j):
 	'''
@@ -127,68 +133,80 @@ def get_LD(i, j):
 	'''
 	# pairwise2 is used to force 'gapless' distance when sequence pair is of the same length
 	if i.junc_len == j.junc_len:
-		identity = pairwise2.align.globalms(i.junc, j.junc, 1, 0, -50, -50, 
-											score_only=True, 
+		identity = pairwise2.align.globalms(i.junc, j.junc, 1, 0, -50, -50,
+											score_only=True,
 											one_alignment_only=True)
 		return i.junc_len - identity
 	# Levenshtein distance is used for sequence pairs of different lengths
 	else:
 		return distance(i.junc, j.junc)
 
+
 def vCompare(i, j):
 	'Calculate penalty for mismatches in Variable segment.'
-	if i.v_gene != j.v_gene: return 10
+	if i.v_gene != j.v_gene:
+		return 10
 	return 0
+
 
 def jCompare(i, j):
 	'Calculate penalty for mismatches in Joining segment.'
-	if i.j_gene != j.j_gene: return 8
+	if i.j_gene != j.j_gene:
+		return 8
 	return 0
+
 
 def sharedMuts(i, j):
 	'Calculate bonus for shared mutations.'
-	if i.id == j.id: return 0.0
+	if i.id == j.id:
+		return 0.0
 	bonus = 0.0
 	for mut in i.muts:
-		if mut == '': continue
-		if mut in j.muts: bonus += 0.35
+		if mut == '':
+			continue
+		if mut in j.muts:
+			bonus += 0.35
 	return bonus
 
 
-#-----------------------------
-#           MONGO
-#-----------------------------
+# -----------------------------
+#             MONGO
+# -----------------------------
+
+
 
 def get_seqs(database, collection):
 	conn = MongoClient(args.ip, args.port)
-	db   = conn[database]
-	c    = db[collection]
-	if args.is_aa: 
+	db = conn[database]
+	c = db[collection]
+	if args.is_aa:
 		junc_query = 'junc_aa'
-	else: 
+	else:
 		junc_query = 'junc_nt'
-	results = c.find({'chain': 'heavy'}, 
+	results = c.find({'chain': 'heavy'},
 					 {'_id': 0, 'seq_id': 1, 'v_gene': 1, 'j_gene': 1, junc_query: 1, 'var_muts_nt': 1})
 	output = []
 	for r in results:
 		if r is not None:
-			if junc_query not in r.keys(): 
+			if junc_query not in r.keys():
 				continue
 			output.append(Seq(r, junc_query))
 	return output
 
+
 def get_collections():
-	if args.coll: 
-		return [args.coll,]
+	if args.coll:
+		return [args.coll, ]
 	conn = MongoClient(args.ip, args.port)
-	db   = conn[args.db]
+	db = conn[args.db]
 	subjects = db.collection_names(include_system_collections=False)
 	return sorted(subjects)
 
+
 def update_db(database, collection, clusters):
 	conn = MongoClient(args.ip, args.port)
-	db   = conn[database]
-	c    = db[collection]
+	db = conn[database]
+	c = db[collection]
 	clust_sizes = []
 	clust_count = 0
 	for clust_id in clusters:
@@ -196,8 +214,8 @@ def update_db(database, collection, clusters):
 		seq_ids = [s.id for s in clusters[clust_id]]
 		if clust_size > 1:
 			if args.update:
-				c.update({'seq_id': {'$in': seq_ids}}, 
-						 {'$set': {'clonify': {'id': clust_id, 'size': clust_size}}}, 
+				c.update({'seq_id': {'$in': seq_ids}},
+						 {'$set': {'clonify': {'id': clust_id, 'size': clust_size}}},
 						 multi=True)
 			clust_count += 1
 			clust_sizes.append(clust_size)
@@ -207,14 +225,19 @@ def update_db(database, collection, clusters):
 	return [clust_count, clustered_seqs, avg_clust_size, max_clust_size]
 
 
-#-----------------------------
-#        CLUSTERING
-#-----------------------------
+
+
+# -----------------------------
+#         CLUSTERING
+# -----------------------------
+
+
 
 def count_cpus():
 	if args.threads:
 		return args.threads
 	return cpu_count()
+
 
 def split_by_gene(seqs):
 	'''
@@ -229,6 +252,7 @@ def split_by_gene(seqs):
 			split[seq.v_gene_string()] = [seq, ]
 	return split
 
+
 def split_by_fam(seqs):
 	'''
 	Splits sequences by variable family.
@@ -242,16 +266,17 @@ def split_by_fam(seqs):
 			split[seq.v_fam_string()] = [seq, ]
 	return split
 
+
 def get_chunksize(input):
 	'''
-	Calculates an appropriate sequence 'chunk' size, based on the number of 
-	input sequences and the number of available processors. 
+	Calculates an appropriate sequence 'chunk' size, based on the number of
+	input sequences and the number of available processors.
 	'''
 	if args.no_split:
 		return len(input)
 	if len(input) < args.chunksize:
 		return len(input)
-	# To cover a rare case where taking math.ceil() will result in too few chunks of sequence data. 
+	# To cover a rare case where taking math.ceil() will result in too few chunks of sequence data.
 	# Overly simple example:
 	# 10 seqs, 6 CPUs will result in creation of 5 chunks of 2 sequences each, with one CPU unused.
 	s = float(len(input)) / cpu_count()
@@ -259,28 +284,33 @@ def get_chunksize(input):
 		return int(s)
 	return int(math.ceil(s))
 
+
 def chunk_maker(n, iterable, fillvalue=None):
 	'''
 	chunk_maker(3, 'ABCDEFG', 'x') --> ['ABC', 'DEF', 'Gxx']
 	where x = fillvalue
 	'''
 	args = [iter(iterable)] * n
-	return [[e for e in t if e != None] for t in itertools.izip_longest(*args)]
+	return [[e for e in t if e is not None] for t in itertools.izip_longest(*args)]
+
 
 def grouper_nofill(n, iterable):
  	'''
  	list(grouper_nofill(3, 'ABCDEFG')) --> [['A', 'B', 'C'], ['D', 'E', 'F'], ['G']]
  	'''
- 	it=iter(iterable)
+ 	it = iter(iterable)
  	def take():
-		while 1: yield list(itertools.islice(it,n))
- 	return iter(take().next,[])
+		while 1:
+			yield list(itertools.islice(it, n))
+ 	return iter(take().next, [])
+
 
 def build_cluster_dict(count, vh):
 	clusters = {}
-	for c in xrange(1,count):
+	for c in xrange(1, count):
 		clusters["lineage_{0}_{1}".format(vh, str(c))] = []
 	return clusters
+
 
 def build_matrix(ichunks, chunksize, size, chunk_count):
 	matrix = np.zeros((size, size))
@@ -291,20 +321,22 @@ def build_matrix(ichunks, chunksize, size, chunk_count):
 	for x, seq in enumerate(grouper_nofill(chunk_count, ichunks)):
 		result = p.imap(clonify, seq)
 		for i, r in enumerate(result):
-			matrix[x*chunksize:x*chunksize+len(r), i*chunksize:i*chunksize+len(r[0])] = r
+			matrix[x * chunksize:x * chunksize + len(r), i * chunksize:i * chunksize + len(r[0])] = r
 	p.close()
 	p.join()
 	return matrix
 
+
 def squareform(matrix):
 	'''
-	Transform a squareform distance matrix into a condensed matrix. Input is an array of size N**2 
+	Transform a squareform distance matrix into a condensed matrix. Input is an array of size N**2
 	(N = number of sequences). Output is an array of size (N * (N-1)) / 2.
 	'''
 	cm = []
 	for i, row in enumerate(matrix[:-1]):
-		cm.extend(row[i+1:])
+		cm.extend(row[i + 1:])
 	return cm
+
 
 def make_clusters(input_seqs, vh):
 	chunksize = get_chunksize(input_seqs)
@@ -323,6 +355,7 @@ def make_clusters(input_seqs, vh):
 	clusters = assign_seqs(flatCluster, clusters, input_seqs, vh)
 	return clusters
 
+
 def assign_seqs(flatCluster, clusters, input_seqs, vh):
 	'''
 	Partition sequences into lineage clusters
@@ -331,6 +364,7 @@ def assign_seqs(flatCluster, clusters, input_seqs, vh):
 		s_id = 'lineage_{0}_{1}'.format(vh, str(flatCluster[s]))
 		clusters[s_id].append(input_seqs[s])
 	return clusters
+
 
 def analyze_collection(coll):
 	'''
@@ -357,33 +391,39 @@ def analyze_collection(coll):
 	print_clonify_start()
 	clusters = {}
 	for vh in sorted(split_seqs.keys()):
-		if len(split_seqs[vh]) <= 1: continue
+		if len(split_seqs[vh]) <= 1:
+			continue
 		print_vh_info(vh)
 		clusters.update(make_clusters(split_seqs[vh], vh))
 	print_clonify_end()
 	clonifyEnd = time.time()
-	
+
 	# update MongoDB
-	if args.update: 
+	if args.update:
 		print_update_start()
 	else:
 		print_no_update()
 	cluster_stats = update_db(args.db, coll, clusters)
 	print_update_end()
 	updateEnd = time.time()
-	
+
 	# write output
 	if args.output != '':
 		print_write_start()
 		write_output(args.output, coll, clusters)
 		print_write_end()
-	else: print_write_null()
+	else:
+		print_write_null()
 	print_run_summary(cluster_stats, startTime, queryEnd, clonifyEnd, updateEnd, len(seqs))
 
 
-#-----------------------------
-#      WRITING/PRINTING
-#-----------------------------
+
+
+# -----------------------------
+#       WRITING/PRINTING
+# -----------------------------
+
+
 
 def write_output(out_dir, collection, data):
 	out_file = os.path.join(out_dir, collection + '_clones.txt')
@@ -396,6 +436,7 @@ def write_output(out_dir, collection, data):
 			rString += '>{0}\n{1}\n'.format(seq.id, seq.junc)
 		rString += '\n'
 	open(out_file, 'w').write(rString)
+
 
 def print_query_start(collection):
 	print ''
@@ -413,32 +454,42 @@ def print_vh_info(vh):
 	print vh
 	print '--------'
 
+
 def print_query_end(seq_count):
 	print '...done. Retrieved {} sequences.\n'.format(seq_count)
+
 
 def print_clonify_start():
 	print 'Sorting sequences into clonal families...'
 
+
 def print_clonify_end():
 	print '...done.\n'
+
 
 def print_update_start():
 	print 'Updating MongoDB...'
 
+
 def print_no_update():
 	print 'Calculating cluster statistics...'
+
 
 def print_update_end():
 	print '...done.\n'
 
+
 def print_write_start():
 	print 'Writing clonal families to file...'
+
 
 def print_write_end():
 	print '...done.\n'
 
+
 def print_write_null():
 	print 'No output directory was provided. Lineage assignments are not being written to file.\n'
+
 
 def print_run_summary(stats, startTime, queryEnd, clonifyEnd, updateEnd, total_count):
 	print ''
@@ -461,4 +512,3 @@ def main():
 
 if __name__ == '__main__':
 	main()
- 

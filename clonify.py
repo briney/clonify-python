@@ -50,9 +50,9 @@ parser.add_argument('-s', '--split_by', dest='split_by', default='none', choices
 					but can provide large reductions in processing time and memory use. Default is 'fam'.")
 parser.add_argument('-t', '--threads', dest='threads', type=int, default=None,
 					help="Number of threads to use. Default is max available.")
-parser.add_argument('-x', '--dist', dest='distance_cutoff', default=0.26, type=float,
+parser.add_argument('-x', '--dist', dest='distance_cutoff', default=0.35, type=float,
 					help="The cutoff adjusted edit distance (aED) for segregating sequences into clonal families. \
-					Defaults to 0.26.")
+					Defaults to 0.35.")
 parser.add_argument('-z', '--no_split', dest='no_split', action='store_true', default=False,
 					help="Use to process all sequences using a single thread. Can reduce errors with very small sequence sets.")
 parser.add_argument('-n', '--nt', dest='is_aa', action='store_false', default=True,

@@ -76,16 +76,23 @@ class Seq(object):
 	'''
 	def __init__(self, data, junc_query):
 		self.id = data['seq_id']
-		self.v_fam = data['v_gene']['fam']
-		self.v_gene = data['v_gene']['gene']
-		self.v_all = data['v_gene']['all']
-		self.j_gene = data['j_gene']['gene']
-		self.j_all = data['j_gene']['all']
+		v_full = data['v_gene']['full']
+		j_full = data['j_gene']['full']
+		self.v_fam = v_full.split('-')[0][4:]
+		self.v_gene = '-'.join(v_full.split('*')[0].split('-')[1:])
+		self.v_all = v_full.split('*')[1]
+		self.j_gene = j_full.split('*')[0][4:]
+		self.j_all = j_full.split('*')[1]
+		# self.v_fam = data['v_gene']['fam']
+		# self.v_gene = data['v_gene']['gene']
+		# self.v_all = data['v_gene']['all']
+		# self.j_gene = data['j_gene']['gene']
+		# self.j_all = data['j_gene']['all']
 		self.junc = data[junc_query]
 		self.junc_len = len(self.junc)
 		self.muts = []
 		if 'var_muts_nt' in data.keys():
-			self.muts = ['{}{}'.format(d['loc'], d['mut']) for d in data['var_muts_nt']]
+			self.muts = ['{}{}'.format(d['loc'], d['mut']) for d in data['var_muts_nt']['muts']]
 
 	def v_gene_string(self):
 		return 'v{0}-{1}'.format(self.v_fam, self.v_gene)

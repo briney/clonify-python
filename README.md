@@ -18,6 +18,16 @@ To run Clonify on the entire dataset without grouping by gene or family (NOTE: t
 `python clonify.py -d <database> -s none`
 
   
+citation  
+--------  
+Briney, B., Le, K., Zhu, J., and Burton, D.R. (2016). Clonify: unseeded antibody lineage assignment from next-generation sequencing data. Sci. Rep. 6, 23901.
+  
+  
+data  
+----  
+Raw data used in the Clonify paper (Briney et al, 2016) can be found at https://github.com/briney/clonify-scirep2016data  
+  
+  
 requirements
 ------------
 python >=2.7  
